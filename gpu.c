@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <sys/time.h>
 
 #ifdef __APPLE__
 #include <OpenCL/opencl.h>
@@ -9,6 +10,13 @@
 #endif
 
 #define MAX_SOURCE_SIZE (0x100000)
+
+double gettime()
+{
+  struct timeval t;
+  gettimeofday(&t, NULL);
+  return t.tv_sec + (double)t.tv_usec * 1e-6;
+}
 
 int main() {
   cl_device_id device_id = NULL;
@@ -21,6 +29,7 @@ int main() {
   cl_uint ret_num_devices;
   cl_uint ret_num_platforms;
   cl_int ret;
+  struct timeval s, e;
 
   cl_ulong val[1];
 
@@ -50,14 +59,14 @@ int main() {
 
   ret = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void*)&memobj);
 
-  clock_t begin = clock();
+  gettimeofday(&s, 0);
 
   ret = clEnqueueTask(command_queue, kernel, 0, NULL, NULL);
 
   ret = clEnqueueReadBuffer(command_queue, memobj, CL_TRUE, 0, sizeof(cl_mem), val, 0, NULL, NULL);
 
-  clock_t end = clock();
-  double runtime = (double)(end - begin) / CLOCKS_PER_SEC;
+  gettimeofday(&e, 0);
+  long long dur = (e.tv_usec + e.tv_sec * 1000000) - (s.tv_usec + s.tv_sec * 1000000);
 
   ret = clFlush(command_queue);
   ret = clFinish(command_queue);
@@ -67,8 +76,7 @@ int main() {
   ret = clReleaseCommandQueue(command_queue);
   ret = clReleaseContext(context);
 
-  printf("Result: %llu\n", val[0]);
-  printf("Runtime: %lfms\n", runtime);
+  printf("Result: %llu in %'lu us\n", val[0], dur);
   
   free(source_str);
 
